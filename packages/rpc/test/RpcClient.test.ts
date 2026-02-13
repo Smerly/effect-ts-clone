@@ -3,8 +3,8 @@
  * Uses a fake Protocol (no HTTP/TCP) so the test passes regardless of environment.
  */
 import { Rpc, RpcClient, RpcGroup } from "@effect/rpc"
-import type { RpcClientError } from "@effect/rpc/RpcClientError"
 import * as RpcClientModule from "@effect/rpc/RpcClient"
+import type { RpcClientError } from "@effect/rpc/RpcClientError"
 import type { FromClientEncoded, FromServerEncoded } from "@effect/rpc/RpcMessage"
 import { assert, describe, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema } from "effect"
@@ -74,7 +74,7 @@ describe("RpcClient", () => {
     it.effect("second client GetUser completes when two clients share the same Protocol", () =>
       Effect.scoped(
         Effect.gen(function*() {
-          const _first = yield* FirstClient
+          yield* FirstClient
           const second = yield* SecondClient
           const user = yield* second.GetUser({ id: "1" })
           assert.deepStrictEqual(user, { id: "1", name: "TestUser" })

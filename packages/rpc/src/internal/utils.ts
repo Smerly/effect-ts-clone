@@ -1,5 +1,5 @@
-import type * as Context from "effect/Context"
 import * as Cause from "effect/Cause"
+import type * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 
 /** @internal */
@@ -23,7 +23,10 @@ export const withRun = <
               Effect.runSync(
                 Effect.provide(fn(...args), subscriberContext).pipe(
                   Effect.catchAllCause((cause) =>
-                    Effect.logError("RpcClient Protocol: subscriber delivery failed (other subscribers still receive message)", cause).pipe(
+                    Effect.logError(
+                      "RpcClient Protocol: subscriber delivery failed (other subscribers still receive message)",
+                      cause
+                    ).pipe(
                       Effect.asVoid
                     )
                   )

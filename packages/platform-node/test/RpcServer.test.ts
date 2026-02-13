@@ -2,9 +2,9 @@ import { HttpClient, HttpClientRequest, HttpRouter, HttpServer, SocketServer } f
 import { NodeHttpServer, NodeSocket, NodeSocketServer, NodeWorker } from "@effect/platform-node"
 import { RpcClient, RpcSerialization, RpcServer } from "@effect/rpc"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Layer, Logger } from "effect"
+import { Effect, Layer } from "effect"
 import * as CP from "node:child_process"
-import { AuthClient, RpcLive, User, UsersClient, SecondRpcClient } from "./fixtures/rpc-schemas.js"
+import { AuthClient, RpcLive, SecondRpcClient, User, UsersClient } from "./fixtures/rpc-schemas.js"
 import { e2eSuite } from "./rpc-e2e.js"
 
 describe("RpcServer", () => {
@@ -173,7 +173,7 @@ describe("RpcServer", () => {
 
     it.effect("second RpcClient (from layer) completes and RPC resolves when layer already provides a client", () =>
       Effect.gen(function*() {
-        const clientFromLayer = yield* UsersClient
+        yield* UsersClient
         const secondClient = yield* SecondRpcClient
         const user = yield* secondClient.GetUser({ id: "1" })
         assert.instanceOf(user, User)
