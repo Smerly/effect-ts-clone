@@ -154,7 +154,7 @@ export const RpcLive = RpcServer.layer(UserRpcs).pipe(
   ])
 )
 
-const AuthClient = RpcMiddleware.layerClient(AuthMiddleware, ({ request }) =>
+export const AuthClient = RpcMiddleware.layerClient(AuthMiddleware, ({ request }) =>
   Effect.succeed({
     ...request,
     headers: Headers.set(request.headers, "name", "Logged in user")
@@ -169,5 +169,15 @@ export class UsersClient extends Context.Tag("UsersClient")<
   )
   static layerTest = Layer.scoped(UsersClient, RpcTest.makeClient(UserRpcs)).pipe(
     Layer.provide([UsersLive, AuthLive, TimingLive, AuthClient])
+  )
+}
+
+/** Second RpcClient sharing the same Protocol - used for #6025 regression test */
+export class SecondRpcClient extends Context.Tag("SecondRpcClient")<
+  SecondRpcClient,
+  RpcClient.RpcClient<RpcGroup.Rpcs<typeof UserRpcs>, RpcClientError>
+>() {
+  static layer = Layer.scoped(SecondRpcClient, RpcClient.make(UserRpcs)).pipe(
+    Layer.provide(AuthClient)
   )
 }

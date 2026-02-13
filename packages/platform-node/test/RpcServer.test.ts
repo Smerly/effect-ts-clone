@@ -2,9 +2,9 @@ import { HttpClient, HttpClientRequest, HttpRouter, HttpServer, SocketServer } f
 import { NodeHttpServer, NodeSocket, NodeSocketServer, NodeWorker } from "@effect/platform-node"
 import { RpcClient, RpcSerialization, RpcServer } from "@effect/rpc"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Logger } from "effect"
 import * as CP from "node:child_process"
-import { RpcLive, User, UsersClient } from "./fixtures/rpc-schemas.js"
+import { AuthClient, RpcLive, User, UsersClient, SecondRpcClient } from "./fixtures/rpc-schemas.js"
 import { e2eSuite } from "./rpc-e2e.js"
 
 describe("RpcServer", () => {
@@ -147,5 +147,37 @@ describe("RpcServer", () => {
         const user = yield* client.GetUser({ id: "1" })
         assert.deepStrictEqual(user, new User({ id: "1", name: "Logged in user" }))
       }).pipe(Effect.provide(UsersClient.layerTest)))
+  })
+
+  /**
+   * Regression test for #6025: RpcClient gets stuck when created twice from different layers.
+   * When multiple Layer.scoped each provide an RpcClient (or one layer + RpcClient.make()),
+   * both share the same Protocol. The Protocol's run() used to allow only one active
+   * callback (semaphore 1), so the second client would block forever or responses would
+   * go to the wrong client. This test ensures two clients from the same Protocol both work.
+   */
+  describe("issue #6025 - RpcClient from layer and from make()", { timeout: 30_000 }, () => {
+    const layer = Layer.merge(UsersClient.layer, SecondRpcClient.layer).pipe(
+      Layer.provide(
+        Layer.merge(
+          RpcClient.layerProtocolHttp({
+            url: "",
+            transformClient: HttpClient.mapRequest(HttpClientRequest.appendUrl("/rpc"))
+          }),
+          AuthClient
+        )
+      ),
+      Layer.provideMerge(HttpNdjsonServer),
+      Layer.provide([NodeHttpServer.layerTest, RpcSerialization.layerNdjson])
+    )
+
+    it.effect("second RpcClient (from layer) completes and RPC resolves when layer already provides a client", () =>
+      Effect.gen(function*() {
+        const clientFromLayer = yield* UsersClient
+        const secondClient = yield* SecondRpcClient
+        const user = yield* secondClient.GetUser({ id: "1" })
+        assert.instanceOf(user, User)
+        assert.deepStrictEqual(user, new User({ id: "1", name: "Logged in user" }))
+      }).pipe(Effect.provide(layer)))
   })
 })
