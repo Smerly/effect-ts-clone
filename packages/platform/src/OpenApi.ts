@@ -253,7 +253,7 @@ export const fromApi = <Id extends string, Groups extends HttpApiGroup.Any, E, R
   }
 
   function processAST(ast: AST.AST): JsonSchema.JsonSchema {
-    return JsonSchema.fromAST(ast, {
+    return JsonSchema.fromAST(HttpApiSchema.flattenUnionAST(ast), {
       defs: jsonSchemaDefs,
       additionalPropertiesStrategy: options?.additionalPropertiesStrategy
     })

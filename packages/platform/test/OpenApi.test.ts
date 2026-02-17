@@ -1777,6 +1777,55 @@ describe("OpenApi", () => {
         })
       })
 
+      // #6052: Union payload must produce a single flat anyOf array (all members at top level), not nested anyOf.
+      // Run with: pnpm --filter @effect/platform test -- --run -t "6052"
+      // If this test fails (e.g. anyOf.length !== expected or hasNestedAnyOf), the bug is present.
+      it("flat union payload emits flat anyOf in request body (#6052)", () => {
+        const A = Schema.Struct({ _tag: Schema.Literal("A"), a: Schema.String })
+        const B = Schema.Struct({ _tag: Schema.Literal("B"), b: Schema.Number })
+        const C = Schema.Struct({ _tag: Schema.Literal("C"), c: Schema.Boolean })
+        const members = [A, B, C] as const
+        const expectedCount = members.length
+
+        const api = HttpApi.make("api").add(
+          HttpApiGroup.make("group").add(
+            HttpApiEndpoint.post("post", "/bar")
+              .addSuccess(Schema.String)
+              .setPayload(Schema.Union(...members))
+          )
+        )
+        const spec = OpenApi.fromApi(api)
+        const requestBodySchema = spec.paths["/bar"]?.post?.requestBody?.content?.["application/json"]?.schema
+        deepStrictEqual(requestBodySchema !== undefined, true)
+        const anyOf = (requestBodySchema as { anyOf?: unknown[] }).anyOf
+        deepStrictEqual(Array.isArray(anyOf), true)
+        deepStrictEqual(anyOf!.length, expectedCount)
+        const hasNestedAnyOf = anyOf!.some(
+          (member) => typeof member === "object" && member !== null && "anyOf" in member
+        )
+        deepStrictEqual(hasNestedAnyOf, false)
+
+        // Nested union must also produce flat anyOf (validates flattening, not just already-flat input)
+        const nestedApi = HttpApi.make("api").add(
+          HttpApiGroup.make("group").add(
+            HttpApiEndpoint.post("postNested", "/bar-nested")
+              .addSuccess(Schema.String)
+              .setPayload(Schema.Union(Schema.Union(A, B), C))
+          )
+        )
+        const nestedSpec = OpenApi.fromApi(nestedApi)
+        const nestedRequestBodySchema =
+          nestedSpec.paths["/bar-nested"]?.post?.requestBody?.content?.["application/json"]?.schema
+        deepStrictEqual(nestedRequestBodySchema !== undefined, true)
+        const nestedAnyOf = (nestedRequestBodySchema as { anyOf?: unknown[] }).anyOf
+        deepStrictEqual(Array.isArray(nestedAnyOf), true)
+        deepStrictEqual(nestedAnyOf!.length, expectedCount)
+        const nestedHasNestedAnyOf = nestedAnyOf!.some(
+          (member) => typeof member === "object" && member !== null && "anyOf" in member
+        )
+        deepStrictEqual(nestedHasNestedAnyOf, false)
+      })
+
       it("Multipart", () => {
         const api = HttpApi.make("api").add(
           HttpApiGroup.make("group").add(

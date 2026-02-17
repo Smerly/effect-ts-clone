@@ -240,6 +240,18 @@ export const UnionUnifyAST = (self: AST.AST, that: AST.AST): AST.AST =>
   AST.Union.make(Array.from(new Set<AST.AST>([...extractUnionTypes(self), ...extractUnionTypes(that)])))
 
 /**
+ * Flattens Union ASTs (including nested) into a single Union so OpenAPI emits one anyOf array.
+ * Uses existing extractUnionTypes; no special-casing. Idempotent for already-flat unions.
+ * @internal
+ */
+export const flattenUnionAST = (ast: AST.AST): AST.AST => {
+  if (!AST.isUnion(ast)) return ast
+  const types = Array.from(extractUnionTypes(ast))
+  if (types.length <= 1) return ast
+  return AST.annotations(AST.Union.make(types), ast.annotations)
+}
+
+/**
  * @since 1.0.0
  */
 export const UnionUnify = <A extends Schema.Schema.All, B extends Schema.Schema.All>(self: A, that: B): Schema.Schema<
