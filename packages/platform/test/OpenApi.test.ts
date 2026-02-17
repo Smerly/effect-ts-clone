@@ -1797,7 +1797,7 @@ describe("OpenApi", () => {
         const spec = OpenApi.fromApi(api)
         const requestBodySchema = spec.paths["/bar"]?.post?.requestBody?.content?.["application/json"]?.schema
         deepStrictEqual(requestBodySchema !== undefined, true)
-        const anyOf = (requestBodySchema as { anyOf?: unknown[] }).anyOf
+        const anyOf = (requestBodySchema as { anyOf?: Array<unknown> }).anyOf
         deepStrictEqual(Array.isArray(anyOf), true)
         deepStrictEqual(anyOf!.length, expectedCount)
         const hasNestedAnyOf = anyOf!.some(
@@ -1814,10 +1814,9 @@ describe("OpenApi", () => {
           )
         )
         const nestedSpec = OpenApi.fromApi(nestedApi)
-        const nestedRequestBodySchema =
-          nestedSpec.paths["/bar-nested"]?.post?.requestBody?.content?.["application/json"]?.schema
+        const nestedRequestBodySchema = nestedSpec.paths["/bar-nested"]?.post?.requestBody?.content?.["application/json"]?.schema
         deepStrictEqual(nestedRequestBodySchema !== undefined, true)
-        const nestedAnyOf = (nestedRequestBodySchema as { anyOf?: unknown[] }).anyOf
+        const nestedAnyOf = (nestedRequestBodySchema as { anyOf?: Array<unknown> }).anyOf
         deepStrictEqual(Array.isArray(nestedAnyOf), true)
         deepStrictEqual(nestedAnyOf!.length, expectedCount)
         const nestedHasNestedAnyOf = nestedAnyOf!.some(
