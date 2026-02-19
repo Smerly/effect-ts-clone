@@ -1,1 +1,1 @@
-../../../sql-pg/test/utils.ts
+export { PgContainer } from "../../../sql-pg/test/utils.js"
