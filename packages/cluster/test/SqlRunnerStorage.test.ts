@@ -17,9 +17,9 @@ const SqliteLayer = Effect.gen(function*() {
 }).pipe(Layer.unwrapScoped, Layer.provide(NodeFileSystem.layer))
 
 // Only sqlite here; pg/mysql/vitess tested in their respective packages to avoid cross-package test deps and dialect flakiness.
-const DIALECTS: ReadonlyArray<readonly [string, Layer.Layer<unknown, never, never>]> = [
+const DIALECTS = [
   ["sqlite", Layer.orDie(SqliteLayer)]
-]
+] as const
 
 describe("SqlRunnerStorage", () => {
   DIALECTS.flatMap(([label, layer]) =>

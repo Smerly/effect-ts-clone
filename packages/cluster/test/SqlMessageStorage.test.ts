@@ -36,9 +36,9 @@ const SqliteLayer = Effect.gen(function*() {
 }).pipe(Layer.unwrapScoped, Layer.provide(NodeFileSystem.layer))
 
 // Only sqlite run here; pg/mysql have dialect-specific behavior and flakiness (unprocessedMessages, duplicate handling, deadlocks).
-const DIALECTS: ReadonlyArray<readonly [string, Layer.Layer<unknown, never, never>]> = [
+const DIALECTS = [
   ["sqlite", Layer.orDie(SqliteLayer)]
-]
+] as const
 
 describe("SqlMessageStorage", () => {
   DIALECTS.forEach(([label, layer]) => {
