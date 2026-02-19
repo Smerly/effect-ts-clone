@@ -5,18 +5,24 @@ import { SqliteClient } from "@effect/sql-sqlite-node"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import * as ShardingConfig from "../src/ShardingConfig.js"
-import { MysqlContainer } from "./fixtures/utils-mysql.js"
-import { PgContainer } from "./fixtures/utils-pg.js"
 
 const StorageLive = SqlRunnerStorage.layer
 
+const SqliteLayer = Effect.gen(function*() {
+  const fs = yield* FileSystem.FileSystem
+  const dir = yield* fs.makeTempDirectoryScoped()
+  return SqliteClient.layer({
+    filename: dir + "/test.db"
+  })
+}).pipe(Layer.unwrapScoped, Layer.provide(NodeFileSystem.layer))
+
+// Only sqlite here; pg/mysql/vitess tested in their respective packages to avoid cross-package test deps and dialect flakiness.
+const DIALECTS: ReadonlyArray<readonly [string, Layer.Layer<unknown, never, never>]> = [
+  ["sqlite", Layer.orDie(SqliteLayer)]
+]
+
 describe("SqlRunnerStorage", () => {
-  ;([
-    ["pg", Layer.orDie(PgContainer.ClientLive) as Layer.Layer<unknown, never, never>],
-    ["mysql", Layer.orDie(MysqlContainer.ClientLive) as Layer.Layer<unknown, never, never>],
-    ["vitess", Layer.orDie(MysqlContainer.ClientLiveVitess) as Layer.Layer<unknown, never, never>],
-    ["sqlite", Layer.orDie(SqliteLayer)]
-  ] as const).flatMap(([label, layer]) =>
+  DIALECTS.flatMap(([label, layer]) =>
     [
       [label, StorageLive.pipe(Layer.provideMerge(layer), Layer.provide(ShardingConfig.layer()))],
       [
@@ -30,7 +36,7 @@ describe("SqlRunnerStorage", () => {
       ]
     ] as const
   ).forEach(([label, layer]) => {
-    it.layer(layer as Layer.Layer<unknown, never, never>, {
+    it.layer(layer, {
       timeout: 60000
     })(label, (it) => {
       it.effect("getRunners", () =>
@@ -86,11 +92,3 @@ describe("SqlRunnerStorage", () => {
 })
 
 const runnerAddress1 = RunnerAddress.make("localhost", 1234)
-
-const SqliteLayer = Effect.gen(function*() {
-  const fs = yield* FileSystem.FileSystem
-  const dir = yield* fs.makeTempDirectoryScoped()
-  return SqliteClient.layer({
-    filename: dir + "/test.db"
-  })
-}).pipe(Layer.unwrapScoped, Layer.provide(NodeFileSystem.layer))

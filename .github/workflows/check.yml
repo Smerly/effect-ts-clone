@@ -56,12 +56,6 @@ jobs:
         if: matrix.runtime == 'Bun'
         with:
           bun-version: 1.0.25
-      - name: Set cluster-only when only cluster package changed
-        run: |
-          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
-          [ -z "$BASE" ] && BASE=HEAD~1
-          CHANGED=$(git diff --name-only $BASE HEAD 2>/dev/null | grep -E '^packages/[^/]+/' | sed 's|^packages/\([^/]*\)/.*|\1|' | sort -u | tr '\n' ' ')
-          [ "$CHANGED" = "cluster" ] && echo "EFFECT_TEST_CLUSTER_ONLY=1" >> $GITHUB_ENV
       - name: Test
         run: pnpm vitest --shard ${{ matrix.shard }}
         if: matrix.runtime == 'Node'

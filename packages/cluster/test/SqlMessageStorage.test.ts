@@ -27,6 +27,14 @@ const truncate = Effect.gen(function*() {
   yield* sql`DELETE FROM cluster_messages`
 })
 
+const SqliteLayer = Effect.gen(function*() {
+  const fs = yield* FileSystem.FileSystem
+  const dir = yield* fs.makeTempDirectoryScoped()
+  return SqliteClient.layer({
+    filename: dir + "/test.db"
+  })
+}).pipe(Layer.unwrapScoped, Layer.provide(NodeFileSystem.layer))
+
 // Only sqlite run here; pg/mysql have dialect-specific behavior and flakiness (unprocessedMessages, duplicate handling, deadlocks).
 const DIALECTS: ReadonlyArray<readonly [string, Layer.Layer<unknown, never, never>]> = [
   ["sqlite", Layer.orDie(SqliteLayer)]
@@ -223,11 +231,3 @@ describe("SqlMessageStorage", () => {
     })
   })
 })
-
-const SqliteLayer = Effect.gen(function*() {
-  const fs = yield* FileSystem.FileSystem
-  const dir = yield* fs.makeTempDirectoryScoped()
-  return SqliteClient.layer({
-    filename: dir + "/test.db"
-  })
-}).pipe(Layer.unwrapScoped, Layer.provide(NodeFileSystem.layer))
