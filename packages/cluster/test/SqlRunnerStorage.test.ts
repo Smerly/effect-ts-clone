@@ -1,20 +1,21 @@
 import { Runner, RunnerAddress, RunnerStorage, ShardId, SqlRunnerStorage } from "@effect/cluster"
 import { FileSystem } from "@effect/platform"
 import { NodeFileSystem } from "@effect/platform-node"
+import { SqlClient } from "@effect/sql/SqlClient"
 import { SqliteClient } from "@effect/sql-sqlite-node"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import * as ShardingConfig from "../src/ShardingConfig.js"
-import { MysqlContainer } from "./fixtures/utils-mysql.js"
-import { PgContainer } from "./fixtures/utils-pg.js"
+import { MysqlContainer } from "../../sql-mysql2/test/utils.js"
+import { PgContainer } from "../../sql-pg/test/utils.js"
 
 const StorageLive = SqlRunnerStorage.layer
 
 describe("SqlRunnerStorage", () => {
   ;([
-    ["pg", Layer.orDie(PgContainer.ClientLive)],
-    ["mysql", Layer.orDie(MysqlContainer.ClientLive)],
-    ["vitess", Layer.orDie(MysqlContainer.ClientLiveVitess)],
+    ["pg", Layer.orDie(PgContainer.ClientLive) as Layer.Layer<unknown, never, never>],
+    ["mysql", Layer.orDie(MysqlContainer.ClientLive) as Layer.Layer<unknown, never, never>],
+    ["vitess", Layer.orDie(MysqlContainer.ClientLiveVitess) as Layer.Layer<unknown, never, never>],
     ["sqlite", Layer.orDie(SqliteLayer)]
   ] as const).flatMap(([label, layer]) =>
     [
@@ -30,7 +31,7 @@ describe("SqlRunnerStorage", () => {
       ]
     ] as const
   ).forEach(([label, layer]) => {
-    it.layer(layer, {
+    it.layer(layer as Layer.Layer<RunnerStorage | SqlClient | SqliteClient, never, never>, {
       timeout: 60000
     })(label, (it) => {
       it.effect("getRunners", () =>

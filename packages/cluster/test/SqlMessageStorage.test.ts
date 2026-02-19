@@ -5,9 +5,9 @@ import { Rpc } from "@effect/rpc"
 import { SqliteClient } from "@effect/sql-sqlite-node"
 import { SqlClient } from "@effect/sql/SqlClient"
 import { assert, describe, expect, it } from "@effect/vitest"
-import { Cause, Effect, Exit, Fiber, Layer, TestClock } from "effect"
-import { MysqlContainer } from "./fixtures/utils-mysql.js"
-import { PgContainer } from "./fixtures/utils-pg.js"
+import { Cause, Chunk, Effect, Exit, Fiber, Layer, TestClock } from "effect"
+import { MysqlContainer } from "../../sql-mysql2/test/utils.js"
+import { PgContainer } from "../../sql-pg/test/utils.js"
 import {
   makeAckChunk,
   makeChunkReply,
@@ -31,8 +31,8 @@ const truncate = Effect.gen(function*() {
 
 describe("SqlMessageStorage", () => {
   ;([
-    ["pg", Layer.orDie(PgContainer.ClientLive)],
-    ["mysql", Layer.orDie(MysqlContainer.ClientLive)],
+    ["pg", Layer.orDie(PgContainer.ClientLive) as Layer.Layer<unknown, never, never>],
+    ["mysql", Layer.orDie(MysqlContainer.ClientLive) as Layer.Layer<unknown, never, never>],
     ["sqlite", Layer.orDie(SqliteLayer)]
   ] as const).forEach(([label, layer]) => {
     it.layer(StorageLive.pipe(Layer.provideMerge(layer)), {
@@ -120,7 +120,7 @@ describe("SqlMessageStorage", () => {
           const exit = yield* Effect.exit(Fiber.join(fiber))
           if (Exit.isFailure(exit)) {
             const failures = Cause.failures(exit.cause)
-            const hasPersistenceError = failures.some(
+            const hasPersistenceError = Chunk.toReadonlyArray(failures).some(
               (e: unknown) => (e as { _tag?: string })._tag === "PersistenceError"
             )
             expect(hasPersistenceError).toBe(true)
