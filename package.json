@@ -9,6 +9,7 @@
     "build": "tsc -b tsconfig.build.json && pnpm --recursive --parallel --filter \"./packages/**/*\" run build",
     "circular": "node scripts/circular.mjs",
     "test": "vitest",
+    "test:cluster-only": "pnpm --filter @effect/cluster run test -- --run",
     "coverage": "vitest --coverage",
     "check": "tsc -b tsconfig.json",
     "check-recursive": "pnpm --recursive --filter \"./packages/**/*\" exec tsc -b tsconfig.json",

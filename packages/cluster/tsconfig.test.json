@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["test"],
+  "include": ["test", "../sql-mysql2/test/utils.ts", "../sql-pg/test/utils.ts"],
   "references": [
     { "path": "tsconfig.src.json" },
     { "path": "../platform-node/tsconfig.src.json" },
@@ -10,7 +10,7 @@
   ],
   "compilerOptions": {
     "tsBuildInfoFile": ".tsbuildinfo/test.tsbuildinfo",
-    "rootDir": "test",
+    "rootDir": "../..",
     "noEmit": true
   }
 }
