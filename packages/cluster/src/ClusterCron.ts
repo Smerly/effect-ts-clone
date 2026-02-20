@@ -2,7 +2,6 @@
  * @since 1.0.0
  */
 import * as Rpc from "@effect/rpc/Rpc"
-import * as Crypto from "node:crypto"
 import * as Cron from "effect/Cron"
 import * as DateTime from "effect/DateTime"
 import * as Duration from "effect/Duration"
@@ -71,7 +70,7 @@ export const make = <E, R>(options: {
       const next = DateTime.unsafeFromDate(Cron.next(options.cron, now))
       const entityId = options.calculateNextRunFromPrevious ? "initial" : DateTime.formatIso(next)
       const client = (yield* CronEntity.client)(entityId)
-      yield* client.run({ dateTime: next, id: Crypto.randomUUID() }, { discard: true })
+      yield* client.run({ dateTime: next, id: crypto.randomUUID() }, { discard: true })
     }),
     { shardGroup: options.shardGroup }
   )
@@ -105,7 +104,7 @@ export const make = <E, R>(options: {
               options.calculateNextRunFromPrevious ? request.payload.dateTime : now
             ))
             const client = makeClient(DateTime.formatIso(next))
-            return yield* client.run({ dateTime: next, id: Crypto.randomUUID() }, { discard: true }).pipe(
+            return yield* client.run({ dateTime: next, id: crypto.randomUUID() }, { discard: true }).pipe(
               Effect.tapErrorCause((cause) => Effect.logWarning("Failed to schedule next run, retrying", cause)),
               Effect.sandbox,
               Effect.retry(retryPolicy),
