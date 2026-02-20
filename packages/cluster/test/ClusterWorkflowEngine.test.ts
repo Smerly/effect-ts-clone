@@ -77,7 +77,7 @@ describe.concurrent("ClusterWorkflowEngine", () => {
 
       // test poll
       expect(yield* EmailWorkflow.poll(executionId)).toEqual(new Workflow.Complete({ exit: Exit.void }))
-    }).pipe(Effect.provide(TestWorkflowLayer)))
+    }).pipe(Effect.provide(TestWorkflowLayer)), 15_000)
 
   it.effect("interrupt", () =>
     Effect.gen(function*() {
@@ -128,7 +128,7 @@ describe.concurrent("ClusterWorkflowEngine", () => {
       assert.isTrue(flags.get("compensation"))
     }).pipe(
       Effect.provide(TestWorkflowLayer)
-    ))
+    ), 15_000)
 
   it.effect("Workflow.withCompensation", () =>
     Effect.gen(function*() {

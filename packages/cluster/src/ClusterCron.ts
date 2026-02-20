@@ -70,7 +70,7 @@ export const make = <E, R>(options: {
       const next = DateTime.unsafeFromDate(Cron.next(options.cron, now))
       const entityId = options.calculateNextRunFromPrevious ? "initial" : DateTime.formatIso(next)
       const client = (yield* CronEntity.client)(entityId)
-      yield* client.run({ dateTime: next }, { discard: true })
+      yield* client.run({ dateTime: next, id: crypto.randomUUID() }, { discard: true })
     }),
     { shardGroup: options.shardGroup }
   )
@@ -104,7 +104,7 @@ export const make = <E, R>(options: {
               options.calculateNextRunFromPrevious ? request.payload.dateTime : now
             ))
             const client = makeClient(DateTime.formatIso(next))
-            return yield* client.run({ dateTime: next }, { discard: true }).pipe(
+            return yield* client.run({ dateTime: next, id: crypto.randomUUID() }, { discard: true }).pipe(
               Effect.tapErrorCause((cause) => Effect.logWarning("Failed to schedule next run, retrying", cause)),
               Effect.sandbox,
               Effect.retry(retryPolicy),
@@ -128,10 +128,11 @@ const retryPolicy = Schedule.exponential(200, 1.5).pipe(
 )
 
 class CronPayload extends Schema.Class<CronPayload>("@effect/cluster/ClusterCron/CronPayload")({
-  dateTime: Schema.DateTimeUtc
+  dateTime: Schema.DateTimeUtc,
+  id: Schema.String
 }) {
   [PrimaryKey.symbol]() {
-    return ""
+    return this.id
   }
   [DeliverAt.symbol]() {
     return this.dateTime
