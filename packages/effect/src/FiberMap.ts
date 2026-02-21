@@ -129,11 +129,17 @@ export const make = <K, A = unknown, E = unknown>(): Effect.Effect<FiberMap<K, A
         const state = map.state
         if (state._tag === "Closed") return Effect.void
         map.state = { _tag: "Closed" }
-        return Fiber.interruptAllAs(
-          Iterable.map(state.backing, ([, fiber]) => fiber),
-          FiberId.combine(parent.id(), internalFiberId)
-        ).pipe(
-          Effect.intoDeferred(map.deferred)
+        const fiberId = FiberId.combine(parent.id(), internalFiberId)
+        const releaseEffect = Effect.gen(function*() {
+          for (const [, fiber] of state.backing) {
+            yield* Fiber.interruptAs(fiber, fiberId)
+          }
+        }).pipe(Effect.asVoid)
+        // Run release in a forked fiber so the interrupted fibers get a chance to run
+        // (fixes Issue 6075: teardown hang when scope closed in onExit path and scheduled
+        // fibers have not yet reached first tick).
+        return Effect.flatMap(Effect.fork(releaseEffect), (f) =>
+          Fiber.join(f).pipe(Effect.intoDeferred(map.deferred))
         )
       })
   )
