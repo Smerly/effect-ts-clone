@@ -138,9 +138,7 @@ export const make = <K, A = unknown, E = unknown>(): Effect.Effect<FiberMap<K, A
         // Run release in a forked fiber so the interrupted fibers get a chance to run
         // (fixes Issue 6075: teardown hang when scope closed in onExit path and scheduled
         // fibers have not yet reached first tick).
-        return Effect.flatMap(Effect.fork(releaseEffect), (f) =>
-          Fiber.join(f).pipe(Effect.intoDeferred(map.deferred))
-        )
+        return Effect.flatMap(Effect.fork(releaseEffect), (f) => Fiber.join(f).pipe(Effect.intoDeferred(map.deferred)))
       })
   )
 

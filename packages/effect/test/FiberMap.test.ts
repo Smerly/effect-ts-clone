@@ -229,8 +229,7 @@ describe("FiberMap", () => {
       Effect.gen(function*() {
         const map = yield* FiberMap.make<string>()
         return {
-          register: (key = "key") =>
-            FiberMap.run(map, key, Effect.schedule(Effect.never, cronEverySecond))
+          register: (key = "key") => FiberMap.run(map, key, Effect.schedule(Effect.never, cronEverySecond))
         }
       })
     ).pipe(Layer.extendScope)
@@ -265,7 +264,7 @@ describe("FiberMap", () => {
 
     it.scoped.each([1, 2, 3, 4, 5])(
       "repro: run %s — teardown completes (no hang) without advancing clock",
-      (runIndex) =>
+      (_runIndex) =>
         Effect.gen(function*() {
           const scope = yield* Scope.Scope
           const runtime = yield* buildRuntime(scope)
@@ -313,8 +312,7 @@ describe("FiberMap", () => {
             Effect.gen(function*() {
               const map = yield* FiberMap.make<string>()
               return {
-                register: () =>
-                  FiberMap.run(map, "key", Effect.schedule(Effect.never, cronEveryMinute))
+                register: () => FiberMap.run(map, "key", Effect.schedule(Effect.never, cronEveryMinute))
               }
             })
           ).pipe(Layer.extendScope)
