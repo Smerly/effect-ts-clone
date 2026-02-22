@@ -285,9 +285,8 @@ class MemoMapImpl implements Layer.MemoMap {
                               }
                             })
                           )
-                        }
+                        })
                       )
-                    )
                     )
                     const memoized = [
                       pipe(
@@ -388,8 +387,7 @@ const makeBuilder = <RIn, E, ROut>(
   const op = self as Primitive
   switch (op._op_layer) {
     case "Locally": {
-      return core.sync(() => (memoMap: Layer.MemoMap) =>
-        op.f(memoMap.getOrElseMemoize(op.self, scope, scopeForDeps)))
+      return core.sync(() => (memoMap: Layer.MemoMap) => op.f(memoMap.getOrElseMemoize(op.self, scope, scopeForDeps)))
     }
     case "ExtendScope": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
@@ -438,8 +436,7 @@ const makeBuilder = <RIn, E, ROut>(
             scope
           )
         )
-        : core.sync(() => (memoMap: Layer.MemoMap) =>
-            memoMap.getOrElseMemoize(self, scope, scopeForDeps))
+        : core.sync(() => (memoMap: Layer.MemoMap) => memoMap.getOrElseMemoize(self, scope, scopeForDeps))
     }
     case "Suspend": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
@@ -463,9 +460,6 @@ const makeBuilder = <RIn, E, ROut>(
     }
     case "ZipWith": {
       return core.gen(function*() {
-        const parallelScope = yield* core.scopeFork(scope, ExecutionStrategy.parallel)
-        const _firstScope = yield* core.scopeFork(parallelScope, ExecutionStrategy.sequential)
-        const _secondScope = yield* core.scopeFork(parallelScope, ExecutionStrategy.sequential)
         const mergeScope = scopeForDeps ?? scope
         return (memoMap: Layer.MemoMap) =>
           pipe(
