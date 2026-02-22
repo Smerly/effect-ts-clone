@@ -158,7 +158,8 @@ describe("Layer", () => {
       const env = Layer.fail("failed!").pipe(Layer.provideMerge(layer1), Layer.orElse(() => layer2), Layer.build)
       yield* Effect.scoped(env)
       const result = yield* Ref.get(ref)
-      deepStrictEqual(Array.from(result), [acquire1, release1, acquire2, release2])
+      // With Issue 5597 fix, left branch's deps are memoized on outer scope so they are released when scope closes (after fallback runs)
+      deepStrictEqual(Array.from(result), [acquire1, acquire2, release2, release1])
     }))
   it.effect("handles errors gracefully", () =>
     Effect.gen(function*() {
@@ -708,6 +709,128 @@ describe("Layer", () => {
         }))
       )
     }))
+
+  /**
+   * Issue 5597: Non-memoized layers in Layer.orElse / on failure path.
+   * When a layer in the failing branch of orElse (or when a dependency fails) is required,
+   * it should be memoized so it is built at most once per build. These tests assert exact
+   * build counts to prevent loopholes (e.g. skipping the layer or building in wrong order).
+   */
+  describe("Issue 5597: Layer memoization with orElse and failure", () => {
+    const CommonTag = Context.GenericTag<{ id: string }>("Common")
+    const FooTag = Context.GenericTag<{ id: string }>("Foo")
+    const BarTag = Context.GenericTag<{ id: string }>("Bar")
+
+    const makeCommonLayer = (buildCount: Ref.Ref<number>) =>
+      Layer.scoped(
+        CommonTag,
+        Effect.acquireRelease(
+          Ref.update(buildCount, (n) => n + 1).pipe(
+            Effect.as({ id: "common" })
+          ),
+          () => Effect.void
+        )
+      )
+
+    const makeFailingFooLayer = (buildCount: Ref.Ref<number>) =>
+      Layer.effect(
+        FooTag,
+        Ref.update(buildCount, (n) => n + 1).pipe(
+          Effect.zipRight(Effect.fail("Foo failed"))
+        )
+      )
+
+    it.effect("orElse(provide(Fail, Common), Common): Common is built once (memoized across failure)", () =>
+      Effect.gen(function*() {
+        const commonCount = yield* Ref.make(0)
+        const fooAttemptCount = yield* Ref.make(0)
+        const Common = makeCommonLayer(commonCount)
+        const Foo = makeFailingFooLayer(fooAttemptCount)
+        const left = Layer.provide(Foo, Common)
+        const right = Common
+        const layer = left.pipe(Layer.orElse(() => right))
+        yield* Effect.scoped(Layer.build(layer))
+        const count = yield* Ref.get(commonCount)
+        const fooAttempts = yield* Ref.get(fooAttemptCount)
+        strictEqual(count, 1, "Common must be built exactly once when orElse fallback is Common")
+        strictEqual(fooAttempts, 1, "Left (failing) branch must be attempted exactly once (closes try-right-first loophole)")
+      }))
+
+    it.effect("orElse(Fail, provide(Bar, Common)): Common is built once in fallback branch", () =>
+      Effect.gen(function*() {
+        const commonCount = yield* Ref.make(0)
+        const Common = makeCommonLayer(commonCount)
+        const Bar = Layer.function(CommonTag, BarTag, (c) => ({ id: `bar-${c.id}` }))
+        const fallback = Bar.pipe(Layer.provide(Common))
+        const layer = Layer.fail("left fails").pipe(Layer.orElse(() => fallback))
+        yield* Effect.scoped(Layer.build(layer))
+        const count = yield* Ref.get(commonCount)
+        strictEqual(count, 1, "Common must be built exactly once in orElse fallback branch")
+      }))
+
+    it.effect("orElse(Fail, merge(Common, provide(Bar, Common))): Common built once in fallback", () =>
+      Effect.gen(function*() {
+        const commonCount = yield* Ref.make(0)
+        const Common = makeCommonLayer(commonCount)
+        const Bar = Layer.function(CommonTag, BarTag, (c) => ({ id: `bar-${c.id}` }))
+        const fallback = Layer.merge(Common, Bar.pipe(Layer.provide(Common)))
+        const layer = Layer.fail("left fails").pipe(Layer.orElse(() => fallback))
+        yield* Effect.scoped(Layer.build(layer))
+        const count = yield* Ref.get(commonCount)
+        strictEqual(count, 1, "Common required twice in fallback (merge + provide) must be built once")
+      }))
+
+    it.effect("merge(provide(Fail, Common), Common): Common built once (shared across merge branches)", () =>
+      Effect.gen(function*() {
+        const commonCount = yield* Ref.make(0)
+        const Common = makeCommonLayer(commonCount)
+        const Foo = makeFailingFooLayer(yield* Ref.make(0))
+        const left = Layer.provide(Foo, Common)
+        const layer = Layer.merge(left, Common)
+        const exit = yield* Effect.scoped(Layer.build(layer)).pipe(Effect.exit)
+        const count = yield* Ref.get(commonCount)
+        strictEqual(count, 1, "Common must be built once even when one merge branch fails")
+        assertTrue(Exit.isFailure(exit), "merge with failing branch should fail")
+      }))
+
+    it.effect("provide(Fail, Common) then same build uses Common elsewhere: Common built once", () =>
+      Effect.gen(function*() {
+        const commonCount = yield* Ref.make(0)
+        const fooAttemptCount = yield* Ref.make(0)
+        const Common = makeCommonLayer(commonCount)
+        const Foo = makeFailingFooLayer(fooAttemptCount)
+        const failingPart = Layer.provide(Foo, Common)
+        const layer = failingPart.pipe(Layer.orElse(() => Common))
+        yield* Effect.scoped(Layer.build(layer))
+        const count = yield* Ref.get(commonCount)
+        const fooAttempts = yield* Ref.get(fooAttemptCount)
+        strictEqual(count, 1, "Common built for failing provide must be memoized for orElse fallback")
+        strictEqual(fooAttempts, 1, "Failing branch must be attempted exactly once (closes try-right-first loophole)")
+      }))
+
+    it.effect("orElse with lazy right: same Common instance in fallback (no double build)", () =>
+      Effect.gen(function*() {
+        const commonCount = yield* Ref.make(0)
+        const Common = makeCommonLayer(commonCount)
+        const layer = Layer.fail("x").pipe(Layer.orElse(() => Layer.merge(Common, Common)))
+        yield* Effect.scoped(Layer.build(layer))
+        const count = yield* Ref.get(commonCount)
+        strictEqual(count, 1, "merge(Common, Common) in fallback must build Common once")
+      }))
+
+    it.effect("merge(Common, provide(Fail, Common)): Common built once despite one branch failing", () =>
+      Effect.gen(function*() {
+        const commonCount = yield* Ref.make(0)
+        const Common = makeCommonLayer(commonCount)
+        const Foo = makeFailingFooLayer(yield* Ref.make(0))
+        const right = Layer.provide(Foo, Common)
+        const layer = Layer.merge(Common, right)
+        const exit = yield* Effect.scoped(Layer.build(layer)).pipe(Effect.exit)
+        const count = yield* Ref.get(commonCount)
+        strictEqual(count, 1, "Common in both merge branches must be built once when one branch fails")
+        assertTrue(Exit.isFailure(exit), "build should fail due to Foo")
+      }))
+  })
 
   describe("MemoMap", () => {
     it.effect("memoizes layer across builds", () =>
