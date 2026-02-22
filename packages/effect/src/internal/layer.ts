@@ -242,8 +242,7 @@ class MemoMapImpl implements Layer.MemoMap {
                       pipe(
                         fiberRuntime.scopeMake(),
                         core.flatMap((innerScope) => {
-                          const depsScope =
-                            scopeForDeps ??
+                          const depsScope = scopeForDeps ??
                             ((layer as Primitive)._op_layer === OpCodes.OP_FOLD ? scope : innerScope)
                           return pipe(
                             restore(core.flatMap(
@@ -289,7 +288,7 @@ class MemoMapImpl implements Layer.MemoMap {
                         }
                       )
                     )
-                  )
+                    )
                     const memoized = [
                       pipe(
                         core.deferredAwait(deferred),
@@ -390,8 +389,7 @@ const makeBuilder = <RIn, E, ROut>(
   switch (op._op_layer) {
     case "Locally": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
-        op.f(memoMap.getOrElseMemoize(op.self, scope, scopeForDeps))
-      )
+        op.f(memoMap.getOrElseMemoize(op.self, scope, scopeForDeps)))
     }
     case "ExtendScope": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
@@ -441,8 +439,7 @@ const makeBuilder = <RIn, E, ROut>(
           )
         )
         : core.sync(() => (memoMap: Layer.MemoMap) =>
-            memoMap.getOrElseMemoize(self, scope, scopeForDeps)
-          )
+            memoMap.getOrElseMemoize(self, scope, scopeForDeps))
     }
     case "Suspend": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
@@ -467,8 +464,8 @@ const makeBuilder = <RIn, E, ROut>(
     case "ZipWith": {
       return core.gen(function*() {
         const parallelScope = yield* core.scopeFork(scope, ExecutionStrategy.parallel)
-        const firstScope = yield* core.scopeFork(parallelScope, ExecutionStrategy.sequential)
-        const secondScope = yield* core.scopeFork(parallelScope, ExecutionStrategy.sequential)
+        const _firstScope = yield* core.scopeFork(parallelScope, ExecutionStrategy.sequential)
+        const _secondScope = yield* core.scopeFork(parallelScope, ExecutionStrategy.sequential)
         const mergeScope = scopeForDeps ?? scope
         return (memoMap: Layer.MemoMap) =>
           pipe(

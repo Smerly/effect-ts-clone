@@ -753,7 +753,11 @@ describe("Layer", () => {
         const count = yield* Ref.get(commonCount)
         const fooAttempts = yield* Ref.get(fooAttemptCount)
         strictEqual(count, 1, "Common must be built exactly once when orElse fallback is Common")
-        strictEqual(fooAttempts, 1, "Left (failing) branch must be attempted exactly once (closes try-right-first loophole)")
+        strictEqual(
+          fooAttempts,
+          1,
+          "Left (failing) branch must be attempted exactly once (closes try-right-first loophole)"
+        )
       }))
 
     it.effect("orElse(Fail, provide(Bar, Common)): Common is built once in fallback branch", () =>
@@ -805,7 +809,11 @@ describe("Layer", () => {
         const count = yield* Ref.get(commonCount)
         const fooAttempts = yield* Ref.get(fooAttemptCount)
         strictEqual(count, 1, "Common built for failing provide must be memoized for orElse fallback")
-        strictEqual(fooAttempts, 1, "Failing branch must be attempted exactly once (closes try-right-first loophole)")
+        strictEqual(
+          fooAttempts,
+          1,
+          "Failing branch must be attempted exactly once (closes try-right-first loophole)"
+        )
       }))
 
     it.effect("orElse with lazy right: same Common instance in fallback (no double build)", () =>
