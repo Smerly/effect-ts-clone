@@ -211,7 +211,8 @@ class MemoMapImpl implements Layer.MemoMap {
    */
   getOrElseMemoize<RIn, E, ROut>(
     layer: Layer.Layer<ROut, E, RIn>,
-    scope: Scope.Scope
+    scope: Scope.Scope,
+    scopeForDeps?: Scope.Scope
   ): Effect.Effect<Context.Context<ROut>, E, RIn> {
     return pipe(
       synchronized.modifyEffect(this.ref, (map) => {
@@ -240,10 +241,12 @@ class MemoMapImpl implements Layer.MemoMap {
                     const resource = core.uninterruptibleMask((restore) =>
                       pipe(
                         fiberRuntime.scopeMake(),
-                        core.flatMap((innerScope) =>
-                          pipe(
+                        core.flatMap((innerScope) => {
+                          const depsScope = scopeForDeps ??
+                            ((layer as Primitive)._op_layer === OpCodes.OP_FOLD ? scope : innerScope)
+                          return pipe(
                             restore(core.flatMap(
-                              makeBuilder(layer, innerScope, true),
+                              makeBuilder(layer, depsScope, true, scopeForDeps),
                               (f) => effect.diffFiberRefs(f(this))
                             )),
                             core.exit,
@@ -282,7 +285,7 @@ class MemoMapImpl implements Layer.MemoMap {
                               }
                             })
                           )
-                        )
+                        })
                       )
                     )
                     const memoized = [
@@ -378,24 +381,25 @@ export const buildWithMemoMap = dual<
 const makeBuilder = <RIn, E, ROut>(
   self: Layer.Layer<ROut, E, RIn>,
   scope: Scope.Scope,
-  inMemoMap = false
+  inMemoMap = false,
+  scopeForDeps?: Scope.Scope
 ): Effect.Effect<(memoMap: Layer.MemoMap) => Effect.Effect<Context.Context<ROut>, E, RIn>> => {
   const op = self as Primitive
   switch (op._op_layer) {
     case "Locally": {
-      return core.sync(() => (memoMap: Layer.MemoMap) => op.f(memoMap.getOrElseMemoize(op.self, scope)))
+      return core.sync(() => (memoMap: Layer.MemoMap) => op.f(memoMap.getOrElseMemoize(op.self, scope, scopeForDeps)))
     }
     case "ExtendScope": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
         fiberRuntime.scopeWith(
-          (scope) => memoMap.getOrElseMemoize(op.layer, scope)
+          (scope) => memoMap.getOrElseMemoize(op.layer, scope, scopeForDeps)
         ) as unknown as Effect.Effect<Context.Context<ROut>, E, RIn>
       )
     }
     case "Fold": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
         pipe(
-          memoMap.getOrElseMemoize(op.layer, scope),
+          memoMap.getOrElseMemoize(op.layer, scope, scope),
           core.matchCauseEffect({
             onFailure: (cause) => memoMap.getOrElseMemoize(op.failureK(cause), scope),
             onSuccess: (value) => memoMap.getOrElseMemoize(op.successK(value), scope)
@@ -409,15 +413,15 @@ const makeBuilder = <RIn, E, ROut>(
     case "FromEffect": {
       return inMemoMap
         ? core.sync(() => (_: Layer.MemoMap) => op.effect as Effect.Effect<Context.Context<ROut>, E, RIn>)
-        : core.sync(() => (memoMap: Layer.MemoMap) => memoMap.getOrElseMemoize(self, scope))
+        : core.sync(() => (memoMap: Layer.MemoMap) => memoMap.getOrElseMemoize(self, scope, scopeForDeps))
     }
     case "Provide": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
         pipe(
-          memoMap.getOrElseMemoize(op.first, scope),
+          memoMap.getOrElseMemoize(op.first, scope, scopeForDeps),
           core.flatMap((env) =>
             pipe(
-              memoMap.getOrElseMemoize(op.second, scope),
+              memoMap.getOrElseMemoize(op.second, scope, scopeForDeps),
               core.provideContext(env)
             )
           )
@@ -432,22 +436,23 @@ const makeBuilder = <RIn, E, ROut>(
             scope
           )
         )
-        : core.sync(() => (memoMap: Layer.MemoMap) => memoMap.getOrElseMemoize(self, scope))
+        : core.sync(() => (memoMap: Layer.MemoMap) => memoMap.getOrElseMemoize(self, scope, scopeForDeps))
     }
     case "Suspend": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
         memoMap.getOrElseMemoize(
           op.evaluate(),
-          scope
+          scope,
+          scopeForDeps
         )
       )
     }
     case "ProvideMerge": {
       return core.sync(() => (memoMap: Layer.MemoMap) =>
         pipe(
-          memoMap.getOrElseMemoize(op.first, scope),
+          memoMap.getOrElseMemoize(op.first, scope, scopeForDeps),
           core.zipWith(
-            memoMap.getOrElseMemoize(op.second, scope),
+            memoMap.getOrElseMemoize(op.second, scope, scopeForDeps),
             op.zipK
           )
         )
@@ -455,14 +460,12 @@ const makeBuilder = <RIn, E, ROut>(
     }
     case "ZipWith": {
       return core.gen(function*() {
-        const parallelScope = yield* core.scopeFork(scope, ExecutionStrategy.parallel)
-        const firstScope = yield* core.scopeFork(parallelScope, ExecutionStrategy.sequential)
-        const secondScope = yield* core.scopeFork(parallelScope, ExecutionStrategy.sequential)
+        const mergeScope = scopeForDeps ?? scope
         return (memoMap: Layer.MemoMap) =>
           pipe(
-            memoMap.getOrElseMemoize(op.first, firstScope),
+            memoMap.getOrElseMemoize(op.first, scope, mergeScope),
             fiberRuntime.zipWithOptions(
-              memoMap.getOrElseMemoize(op.second, secondScope),
+              memoMap.getOrElseMemoize(op.second, scope, mergeScope),
               op.zipK,
               { concurrent: true }
             )

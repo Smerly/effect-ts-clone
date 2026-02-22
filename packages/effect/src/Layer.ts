@@ -132,7 +132,8 @@ export interface MemoMap {
   /** @internal */
   readonly getOrElseMemoize: <RIn, E, ROut>(
     layer: Layer<ROut, E, RIn>,
-    scope: Scope.Scope
+    scope: Scope.Scope,
+    scopeForDeps?: Scope.Scope
   ) => Effect.Effect<Context.Context<ROut>, E, RIn>
 }
 
